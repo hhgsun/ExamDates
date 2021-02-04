@@ -1,12 +1,9 @@
 import 'dart:convert';
 import 'package:examdates/models/NotificationContent.dart';
-import 'package:examdates/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DataService {
   String _key = 'nots';
-  NotificationService notificationService = new NotificationService();
-
   Future<List<NotificationContent>> getAll() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     List<String> list = prefs.getStringList(_key);
@@ -16,6 +13,16 @@ class DataService {
     return list.map((e) {
       return NotificationContent.fromJson(json.decode(e));
     }).toList();
+  }
+
+  Future<NotificationContent> getOne(String id) async {
+    List<NotificationContent> nots = await getAll();
+    List<NotificationContent> list =
+        nots.where((element) => element.id.toString() == id).toList();
+    if (list.length > 0) {
+      return list.first;
+    }
+    return null;
   }
 
   Future<void> add(NotificationContent notificationContent) async {
@@ -29,8 +36,7 @@ class DataService {
     return prefs.setStringList(_key, strList);
   }
 
-  Future<void> update(
-      int id, NotificationContent notificationContent) async {
+  Future<void> update(int id, NotificationContent notificationContent) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     List<NotificationContent> nots = await getAll();
     List<String> strList = new List<String>();

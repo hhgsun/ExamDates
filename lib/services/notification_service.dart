@@ -1,32 +1,76 @@
+// NOTIFICATION EXAMPLE DEMO:
+// https://bitbucket.org/vipinvijayan1987/tutorialprojects/src/LocalNotifications/FlutterTutorialProjects/flutter_demos/
+
 import 'package:examdates/models/NotificationContent.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'dart:io' show Platform;
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:rxdart/subjects.dart';
 
 class NotificationService {
   FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
-  List<PendingNotificationRequest> pendingNotificationRequests =
-      new List<PendingNotificationRequest>();
+  final BehaviorSubject<ReceivedNotification>
+      didReceivedLocalNotificationSubject =
+      BehaviorSubject<ReceivedNotification>();
+  var initializationSettings;
 
-  NotificationService();
-
-  void init(Function onSelectNotification) {
-    flutterLocalNotificationsPlugin = new FlutterLocalNotificationsPlugin();
-    var android = new AndroidInitializationSettings('@mipmap/ic_launcher');
-    var iOS = new IOSInitializationSettings();
-    var initSettings = new InitializationSettings(android: android, iOS: iOS);
-    flutterLocalNotificationsPlugin.initialize(initSettings,
-        onSelectNotification: onSelectNotification);
-    tz.initializeTimeZones();
-    getPendingNotfs();
+  NotificationService._() {
+    init();
   }
 
-  Future<List<PendingNotificationRequest>> getPendingNotfs() {
-    return flutterLocalNotificationsPlugin.pendingNotificationRequests();
+  init() async {
+    flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+    if (Platform.isIOS) {
+      _requestIOSPermission();
+    }
+    initializePlatformSpecifics();
   }
 
-  void show() async {
+  initializePlatformSpecifics() {
+    var initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    var initializationSettingsIOS = IOSInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: false,
+      onDidReceiveLocalNotification: (id, title, body, payload) async {
+        ReceivedNotification receivedNotification = ReceivedNotification(
+            id: id, title: title, body: body, payload: payload);
+        didReceivedLocalNotificationSubject.add(receivedNotification);
+      },
+    );
+
+    initializationSettings = InitializationSettings(
+        android: initializationSettingsAndroid, iOS: initializationSettingsIOS);
+  }
+
+  _requestIOSPermission() {
+    flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin>()
+        .requestPermissions(
+          alert: false,
+          badge: true,
+          sound: true,
+        );
+  }
+
+  setListenerForLowerVersions(Function onNotificationInLowerVersions) {
+    didReceivedLocalNotificationSubject.listen((receivedNotification) {
+      onNotificationInLowerVersions(receivedNotification);
+    });
+  }
+
+  setOnNotificationClick(Function onNotificationClick) async {
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings,
+        onSelectNotification: (String payload) async {
+      onNotificationClick(payload);
+    });
+  }
+
+  Future<void> show() async {
     var android = new AndroidNotificationDetails(
         "channelId", "channelName", "channelDescription");
     var iOS = new IOSNotificationDetails();
@@ -35,48 +79,24 @@ class NotificationService {
         payload: "custom payload");
   }
 
-  void addSchedule(NotificationContent notificationContent) async {
-    var androidDetails = new AndroidNotificationDetails(
-      notificationContent.id.toString(),
-      notificationContent.title,
-      notificationContent.body,
-      importance: Importance.max,
-      priority: Priority.high,
-      color: Colors.blue,
-      playSound: true,
-    );
-    var iSODetails = new IOSNotificationDetails();
-    var generalNotificationDetails =
-        new NotificationDetails(android: androidDetails, iOS: iSODetails);
-    //var time = tz.TZDateTime.now(tz.local).add(const Duration(seconds: 30));
-    var str = notificationContent.date;
-    var time = tz.TZDateTime.from(str, tz.local);
-    flutterLocalNotificationsPlugin.zonedSchedule(
-      notificationContent.id,
-      notificationContent.title,
-      notificationContent.body,
-      time,
-      generalNotificationDetails,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      androidAllowWhileIdle: true,
-    );
-  }
-
   Future<void> cancelNotification(int id) async {
     await flutterLocalNotificationsPlugin.cancel(id);
   }
-  // Zamanlanmış bildirimleri işlemeye çalış (burası çalışıyor -dökümandan aldım)
+
+  Future<List<PendingNotificationRequest>> getPendingNotfs() {
+    return flutterLocalNotificationsPlugin.pendingNotificationRequests();
+  }
+
   Future<void> zonedScheduleNotification(NotificationContent not) async {
-    var d = new DateTime(not.date.year, not.date.month, not.date.day, not.beforeTime.hour, not.beforeTime.minute);
+    tz.initializeTimeZones();
+    var d = new DateTime(not.date.year, not.date.month, not.date.day,
+        not.beforeTime.hour, not.beforeTime.minute);
     var dStr = d.toString();
-    print(dStr);
     var time = tz.TZDateTime.parse(tz.local, dStr);
     await flutterLocalNotificationsPlugin.zonedSchedule(
       not.id,
       not.title,
       not.body,
-      //tz.TZDateTime.now(tz.local).add(const Duration(seconds: 5)),
       time,
       NotificationDetails(
         android:
@@ -90,4 +110,18 @@ class NotificationService {
   }
 }
 
-NotificationService notificationService = new NotificationService();
+NotificationService notificationService = NotificationService._();
+
+class ReceivedNotification {
+  final int id;
+  final String title;
+  final String body;
+  final String payload;
+
+  ReceivedNotification({
+    @required this.id,
+    @required this.title,
+    @required this.body,
+    @required this.payload,
+  });
+}

@@ -5,6 +5,8 @@ import 'package:examdates/services/notification_service.dart';
 import 'package:flutter/material.dart';
 
 class AddExamPage extends StatefulWidget {
+  static const String routeName = '/add';
+
   final NotificationContent notificationContent;
 
   const AddExamPage({Key key, this.notificationContent}) : super(key: key);
@@ -43,12 +45,16 @@ class _AddExamPageState extends State<AddExamPage> {
   }
 
   void _selectDate(BuildContext context) async {
+    var initialDate = selectedDate != null ? selectedDate : DateTime.now();
+    if (DateTime.now().isAfter(initialDate)) {
+      initialDate = DateTime.now();
+    }
     final DateTime picked = await showDatePicker(
       context: context,
-      initialDate: selectedDate != null ? selectedDate : DateTime.now(),
+      initialDate: initialDate,
       initialDatePickerMode: DatePickerMode.day,
-      firstDate: DateTime(2015),
-      lastDate: DateTime(2101),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
     );
     if (picked != null)
       setState(() {
@@ -64,7 +70,7 @@ class _AddExamPageState extends State<AddExamPage> {
           : TimeOfDay(hour: 00, minute: 00),
     );
     if (picked != null) {
-      var now = new DateTime.now();
+      var now = new DateTime.now().add(Duration(days: 2));
       setState(() {
         selectedTime =
             DateTime(now.year, now.month, now.day, picked.hour, picked.minute);
@@ -80,7 +86,7 @@ class _AddExamPageState extends State<AddExamPage> {
           : TimeOfDay(hour: 00, minute: 00),
     );
     if (picked != null) {
-      var now = new DateTime.now();
+      var now = new DateTime.now().add(Duration(days: 2));
       setState(() {
         selectedBeforeTime =
             DateTime(now.year, now.month, now.day, picked.hour, picked.minute);
@@ -88,7 +94,7 @@ class _AddExamPageState extends State<AddExamPage> {
     }
   }
 
-  void sendSave() {
+  Future<void> sendSave() async {
     if (this.selectedDate == null ||
         this.selectedTime == null ||
         this.selectedBeforeTime == null) {
@@ -110,16 +116,28 @@ class _AddExamPageState extends State<AddExamPage> {
         this.selectedTime,
         this.selectedBeforeTime,
       );
-      if (isUpdate) {
-        dataService.update(widget.notificationContent.id, not);
-        Navigator.of(context).pop('Güncelleme gerçekleşti');
+      var d = new DateTime(not.date.year, not.date.month, not.date.day,
+          not.beforeTime.hour, not.beforeTime.minute);
+
+      if (DateTime.now().isAfter(d)) {
+        showCustomAlert(context,
+            title: 'Geleceğe Yönelik Zaman Belirtiniz', isSuccess: false);
       } else {
-        dataService.add(not).then((value) {
-          notificationService.zonedScheduleNotification(not).then((value) {
-            print("BİLDİRİM EKLENDİ");
+        showLoading(context);
+        if (isUpdate) {
+          await dataService.update(widget.notificationContent.id, not);
+          await notificationService
+              .cancelNotification(widget.notificationContent.id);
+        } else {
+          await dataService.add(not);
+        }
+        notificationService.zonedScheduleNotification(not).then((value) {
+          hideLoading(context);
+          showCustomAlert(context, title: 'Başarılı').then((value) {
+            Navigator.of(context).pop(
+                isUpdate ? 'Güncelleme gerçekleşti' : 'Ekleme gerçekleşti');
           });
         });
-        Navigator.of(context).pop('Ekleme gerçekleşti');
       }
     }
   }
@@ -139,8 +157,10 @@ class _AddExamPageState extends State<AddExamPage> {
           isUpdate
               ? IconButton(
                   icon: Icon(Icons.remove_circle_outline),
-                  onPressed: () {
+                  onPressed: () async {
                     dataService.delete(widget.notificationContent.id);
+                    notificationService
+                        .cancelNotification(widget.notificationContent.id);
                     Navigator.of(context).pop('Silme gerçekleşti');
                   })
               : Text(''),

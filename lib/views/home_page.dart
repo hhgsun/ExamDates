@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class HomePage extends StatefulWidget {
+  static const String routeName = '/';
   @override
   _HomePageState createState() => _HomePageState();
 }
@@ -21,6 +22,7 @@ class _HomePageState extends State<HomePage> {
 
   DataService dataService = new DataService();
   List<NotificationContent> notificationsData = List<NotificationContent>();
+  String lastPayload;
 
   @override
   void initState() {
@@ -28,20 +30,27 @@ class _HomePageState extends State<HomePage> {
     super.initState();
   }
 
-  void getAllData() {
+  void getAllData() async {
     setState(() {
       this.isLoad = false;
     });
-    this.dataService.getAll().then((value) {
-      setState(() {
-        this.notificationsData = value;
-        this.isLoad = true;
-      });
-    });
-    // bu kısımdan gelen id lere ait local dataları işaretle {done=0} olarak
-    notificationService.getPendingNotfs().then((value) {
-      setState(() {
-        pendingNotificationRequests = value;
+    notificationService
+        .setListenerForLowerVersions(onNotificationInLowerVersions);
+    notificationService.setOnNotificationClick(onNotificationClick);
+    this.dataService.getAll().then((contents) {
+      notificationService.getPendingNotfs().then((pendings) {
+        pendingNotificationRequests = pendings;
+        contents.forEach((content) {
+          pendingNotificationRequests.forEach((pending) {
+            if (content.id == pending.id) {
+              content.done = 0; // henüz bildirimi bekleniyor
+            }
+          });
+        });
+        setState(() {
+          this.notificationsData = contents;
+          this.isLoad = true;
+        });
       });
     });
   }
@@ -62,6 +71,22 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  onNotificationInLowerVersions(ReceivedNotification receivedNotification) {
+    print('Notification Received ${receivedNotification.id}');
+  }
+
+  onNotificationClick(String payload) {
+    if (lastPayload != payload) {
+      lastPayload = payload;
+      dataService.getOne(payload).then((not) {
+        showCustomAlert(context, title: not.title, desc: not.body)
+            .then((value) {
+          this.getAllData();
+        });
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -73,7 +98,7 @@ class _HomePageState extends State<HomePage> {
             textColor: Colors.white,
             onPressed: () => openAddExamPage(context),
             child: Row(
-              children: [Icon(Icons.add), Text('Yeni Ekle')],
+              children: [Icon(Icons.add_alert), Text('Yeni Ekle')],
             ),
             shape: CircleBorder(side: BorderSide(color: Colors.transparent)),
           ),
@@ -81,29 +106,25 @@ class _HomePageState extends State<HomePage> {
       ),
       body: isLoad
           ? notificationsData.length > 0
-              ? SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      Column(
-                        children: notificationsData
-                            .map(
-                              (n) => ListTile(
-                                title: Text(n.title),
-                                subtitle: Text(n.body),
-                                leading: Text(n.id.toString()),
-                                onTap: () => openAddExamPage(context, not: n),
-                              ),
-                            )
-                            .toList(),
-                      ),
-                      Divider(color: Colors.red),
-                      Text('Bildirim Bekleyen İd ler'),
-                      Column(
-                          children: pendingNotificationRequests
-                              .map((e) => Text(e.id.toString()))
-                              .toList())
-                    ],
-                  ),
+              ? ListView.separated(
+                  separatorBuilder: (context, i) => Divider(),
+                  itemCount: notificationsData.length,
+                  itemBuilder: (context, index) {
+                    return ListTile(
+                      contentPadding: EdgeInsets.symmetric(
+                          horizontal: 20.0, vertical: 10.0),
+                      tileColor: notificationsData[index].done == 0
+                          ? Colors.black26
+                          : Colors.transparent,
+                      title: Text(notificationsData[index].title),
+                      subtitle: Text(notificationsData[index].body),
+                      trailing: notificationsData[index].done == 0
+                          ? Icon(Icons.watch_later_outlined)
+                          : Icon(Icons.done_rounded),
+                      onTap: () => openAddExamPage(context,
+                          not: notificationsData[index]),
+                    );
+                  },
                 )
               : Center(
                   child: Text('Zamanlanmış sınav yok.'),
