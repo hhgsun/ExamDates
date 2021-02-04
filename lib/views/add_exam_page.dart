@@ -3,6 +3,7 @@ import 'package:examdates/models/NotificationContent.dart';
 import 'package:examdates/services/data_service.dart';
 import 'package:examdates/services/notification_service.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class AddExamPage extends StatefulWidget {
   static const String routeName = '/add';
@@ -133,10 +134,8 @@ class _AddExamPageState extends State<AddExamPage> {
         }
         notificationService.zonedScheduleNotification(not).then((value) {
           hideLoading(context);
-          showCustomAlert(context, title: 'Başarılı').then((value) {
-            Navigator.of(context).pop(
-                isUpdate ? 'Güncelleme gerçekleşti' : 'Ekleme gerçekleşti');
-          });
+          Navigator.of(context)
+              .pop(isUpdate ? 'Güncelleme gerçekleşti' : 'Ekleme gerçekleşti');
         });
       }
     }
@@ -158,26 +157,28 @@ class _AddExamPageState extends State<AddExamPage> {
               ? IconButton(
                   icon: Icon(Icons.remove_circle_outline),
                   onPressed: () async {
-                    dataService.delete(widget.notificationContent.id);
-                    notificationService
-                        .cancelNotification(widget.notificationContent.id);
-                    Navigator.of(context).pop('Silme gerçekleşti');
+                    showCustomConfirm(context,
+                            title: 'Silmek istediğinize emin misiniz?')
+                        .then((value) {
+                      if (value != null && value == true) {
+                        dataService.delete(widget.notificationContent.id);
+                        notificationService
+                            .cancelNotification(widget.notificationContent.id);
+                        Navigator.of(context).pop('Silme gerçekleşti');
+                      }
+                    });
                   })
               : Text(''),
         ],
       ),
-      bottomSheet: Container(
+      bottomNavigationBar: MaterialButton(
+        minWidth: MediaQuery.of(context).size.width,
         height: 60.0,
-        alignment: Alignment.center,
-        child: FlatButton(
-          minWidth: MediaQuery.of(context).size.width * 0.9,
-          height: 50.0,
-          color: Theme.of(context).primaryColor,
-          onPressed: () => sendSave(),
-          child: Text(
-            isUpdate ? 'Kaydet' : 'Ekle',
-            style: TextStyle(color: Colors.white, fontSize: 17),
-          ),
+        color: Theme.of(context).primaryColor,
+        onPressed: () => sendSave(),
+        child: Text(
+          isUpdate ? 'Kaydet' : 'Ekle',
+          style: TextStyle(color: Colors.white, fontSize: 17),
         ),
       ),
       body: SingleChildScrollView(
@@ -222,13 +223,7 @@ class _AddExamPageState extends State<AddExamPage> {
                     _selectDate(context);
                   },
                   trailing: selectedDate != null
-                      ? Text(
-                          selectedDate.day.toString() +
-                              " " +
-                              selectedDate.month.toString() +
-                              " " +
-                              selectedDate.year.toString(),
-                        )
+                      ? Text(DateFormat('dd.MM.yyyy').format(this.selectedDate))
                       : Text('Sınav tarihi seçin'),
                   subtitle: errorMsgDate != ''
                       ? Text(
@@ -248,11 +243,7 @@ class _AddExamPageState extends State<AddExamPage> {
                     _selectTime(context);
                   },
                   trailing: selectedTime != null
-                      ? Text(
-                          selectedTime.hour.toString() +
-                              ":" +
-                              selectedTime.minute.toString(),
-                        )
+                      ? Text(DateFormat('HH:mm').format(this.selectedTime))
                       : Text('Sınav saati seçin'),
                   subtitle: errorMsgTime != ''
                       ? Text(
@@ -273,10 +264,7 @@ class _AddExamPageState extends State<AddExamPage> {
                   },
                   trailing: selectedBeforeTime != null
                       ? Text(
-                          selectedBeforeTime.hour.toString() +
-                              ":" +
-                              selectedBeforeTime.minute.toString(),
-                        )
+                          DateFormat('HH:mm').format(this.selectedBeforeTime))
                       : Text('Hatırlatma saati seçin'),
                   subtitle: errorMsgBeforeTime != ''
                       ? Text(

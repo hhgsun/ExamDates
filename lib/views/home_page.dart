@@ -5,6 +5,7 @@ import 'package:examdates/services/notification_service.dart';
 import 'package:examdates/views/add_exam_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:intl/intl.dart';
 
 class HomePage extends StatefulWidget {
   static const String routeName = '/';
@@ -47,6 +48,7 @@ class _HomePageState extends State<HomePage> {
             }
           });
         });
+        contents.sort((a, b) => a.done.compareTo(b.done));
         setState(() {
           this.notificationsData = contents;
           this.isLoad = true;
@@ -107,7 +109,7 @@ class _HomePageState extends State<HomePage> {
       body: isLoad
           ? notificationsData.length > 0
               ? ListView.separated(
-                  separatorBuilder: (context, i) => Divider(),
+                  separatorBuilder: (context, i) => Divider(color: Colors.black38,),
                   itemCount: notificationsData.length,
                   itemBuilder: (context, index) {
                     return ListTile(
@@ -115,9 +117,43 @@ class _HomePageState extends State<HomePage> {
                           horizontal: 20.0, vertical: 10.0),
                       tileColor: notificationsData[index].done == 0
                           ? Colors.black26
-                          : Colors.transparent,
+                          : Colors.black12,
                       title: Text(notificationsData[index].title),
-                      subtitle: Text(notificationsData[index].body),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(notificationsData[index].body),
+                          Padding(
+                            padding: EdgeInsets.symmetric(vertical: 5.0),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.calendar_today_outlined,
+                                  size: 15,
+                                ),
+                                SizedBox(width: 3),
+                                Text(DateFormat('dd.MM.yyyy')
+                                    .format(notificationsData[index].date)),
+                                SizedBox(width: 3),
+                                Text(
+                                  DateFormat('HH:mm')
+                                      .format(notificationsData[index].time),
+                                  style: TextStyle(color: Colors.white54),
+                                ),
+                                SizedBox(width: 10),
+                                Icon(
+                                  Icons.alarm_rounded,
+                                  size: 15,
+                                ),
+                                SizedBox(width: 3),
+                                Text(DateFormat('HH:mm').format(
+                                    notificationsData[index].beforeTime)),
+                              ],
+                            ),
+                          )
+                        ],
+                      ),
                       trailing: notificationsData[index].done == 0
                           ? Icon(Icons.watch_later_outlined)
                           : Icon(Icons.done_rounded),

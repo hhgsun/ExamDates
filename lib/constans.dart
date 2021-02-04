@@ -67,6 +67,31 @@ Future<void> showCustomAlert(context,
   );
 }
 
+Future<bool> showCustomConfirm(context, {String title}) async {
+  return showDialog<bool>(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text(title),
+        actions: <Widget>[
+          FlatButton(
+            onPressed: () {
+              Navigator.of(context).pop(true);
+            },
+            child: Text('Sil'),
+          ),
+          FlatButton(
+            onPressed: () {
+              Navigator.of(context).pop(false);
+            },
+            child: Text('Vazgeç'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 void showLoading(context) {
   showDialog(
     context: context,
@@ -74,12 +99,17 @@ void showLoading(context) {
     builder: (BuildContext context) {
       return Dialog(
         insetPadding: EdgeInsets.all(20.0),
-        child: new Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            new CircularProgressIndicator(),
-            new Text("Bekleyiniz..."),
-          ],
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 16.0),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(width: 16.0),
+              CircularProgressIndicator(),
+              SizedBox(width: 16.0),
+              Text("Bekleyiniz..."),
+            ],
+          ),
         ),
       );
     },
